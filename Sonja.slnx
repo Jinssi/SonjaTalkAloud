@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/Tests/">
+    <Project Path="Tests/Sonja.ReadAloud.Tests.csproj" />
+  </Folder>
+  <Project Path="Sonja.ReadAloud.csproj" />
+</Solution>

@@ -1,0 +1,18 @@
+.env
+.env.*
+!.env.example
+.vs/
+.vscode/
+bin/
+obj/
+artifacts/
+*.user
+*.suo
+TestResults/
+
+# Local scratch / temp files
+*.tmp
+*.log
+.tts-*
+.icon-*
+.make-icon.ps1
