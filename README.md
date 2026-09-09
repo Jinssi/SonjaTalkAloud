@@ -2,7 +2,7 @@
 
 Read the **text you've selected** aloud in any Windows app with one keyboard shortcut. Press once to read, again to stop. Sonja sits in the system tray and speaks with your own Azure AI Speech key.
 
-![Sonja settings window](Assets/screenshot.png)
+![Sonja settings window](image.png)
 
 ## Features
 
