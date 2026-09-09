@@ -1,186 +1,71 @@
 # 🌸 Sonja Read Aloud
 
-**Sonja** is a lightweight Windows app that reads your **selected text aloud** from almost any application — browsers, documents, email, PDFs, code editors — with a single global keyboard shortcut and high‑quality neural text‑to‑speech.
+Read the **text you've selected** aloud in any Windows app with one keyboard shortcut. Press once to read, again to stop. Sonja sits in the system tray and speaks with your own Azure AI Speech key.
 
-Select some text, press your shortcut, and Sonja speaks it. Press it again to stop. That's it. Sonja lives quietly in the notification area (system tray) and stays out of your way.
+![Sonja settings window](Assets/screenshot.png)
 
-> Sonja is bring‑your‑own‑key: you connect it to your own text‑to‑speech provider. No accounts, telemetry, or credentials are bundled with the app — you stay in full control of your keys and costs.
+## Features
 
----
+- Reads the current selection anywhere (UI Automation, with a clipboard fallback).
+- One global shortcut, fully configurable (default **Ctrl + Alt + R**).
+- **Attitude** — Azure neural speaking styles (friendly, cheerful, empathetic, excited, newsreader…) with adjustable intensity, so it sounds natural instead of flat.
+- Recommended natural voices (★) and style‑capable voices (· styles) surfaced first.
+- Adjustable voice and speed; optional start with Windows.
+- Bring‑your‑own‑key: no accounts or telemetry. Paste your Azure Speech key in the app — it's stored encrypted for your Windows account (DPAPI).
 
-## ✨ Features
+## Quick start
 
-- **Read selection aloud anywhere** — works across most Windows apps via UI Automation, with a clipboard fallback.
-- **One global shortcut** — fully configurable (default **Ctrl + Alt + R**). Press once to read, again to stop.
-- **Multiple TTS providers** — Azure AI Speech (including DragonHD / neural voices), Azure OpenAI TTS (Microsoft Foundry), or ElevenLabs.
-- **Adjustable voice & speed** — pick any voice your provider offers and fine‑tune the speaking rate.
-- **Runs in the tray** — closing the window keeps Sonja running; right‑click the tray icon for settings, a voice test, or exit.
-- **Start with Windows** — optional auto‑start at sign‑in.
-- **Private by design** — credentials live only in a local `.env` (or your own environment variables) and are never written to settings or logs.
+1. **Get an Azure Speech key.** Create an **Azure AI Speech** resource in the [Azure portal](https://portal.azure.com) → **Keys and Endpoint**, then copy **Key 1** + **Region** (the free F0 tier is enough).
+2. **Run Sonja** (grab a published build, or from source: `dotnet run --project Sonja.ReadAloud.csproj`).
+3. **Connect.** In the **Azure Speech connection** panel, paste your **Key** and **Region** (e.g. `westeurope`) and click **Save & connect**. Your key is saved encrypted — no rebuild or `.env` needed.
+4. Click **Refresh voices**, pick a voice and attitude, then **Save settings**.
 
----
+> **Prefer a file?** You can instead put `SPEECH_KEY` and `SPEECH_REGION` in a `.env` beside the executable (copy `.env.example`). A key entered in the app takes precedence.
 
-## 🧩 How it works
+> **Sharing the repo?** Everyone brings their own key — the repo ships none. Send the source or a published build; each person enters their own key in the app (or their own `.env`). Never commit `.env` (it's in `.gitignore`); rotate a key if it ever leaks.
 
-Sonja reads configuration at startup and picks the first provider that is fully configured, in this order:
+## Voices & attitude
 
-1. **Azure AI Speech** (preferred) — requires `SPEECH_KEY` + `SPEECH_REGION` (or `SPEECH_ENDPOINT`).
-2. **ElevenLabs** — requires `ELEVENLABS_API_KEY`.
-3. **Azure OpenAI TTS** (Microsoft Foundry) — requires `AZURE_OPENAI_TTS_*`.
+Click **Refresh voices** to load every voice on your resource. Recommended natural voices appear first (★); voices tagged **· styles** support attitude.
 
-This lets you keep Azure Speech as your main voice while having a fallback available. You only need **one** provider configured to use the app.
+| Voice | Character | Styles |
+| --- | --- | --- |
+| `en-US-Ava:DragonHDLatestNeural` | Ultra‑natural HD (default) | – |
+| `en-US-AvaMultilingualNeural` | Natural, multilingual | – |
+| `en-US-AriaNeural` | Versatile, widest style set | ✅ |
+| `en-US-JennyNeural` | Warm assistant | ✅ |
+| `en-US-SaraNeural` | Youthful and lively | ✅ |
+| `en-GB-SoniaNeural` | British English | ✅ |
 
----
+Pick an **Attitude** (e.g. *Cheerful*, *Empathetic*, *Newsreader*) and set **Intensity** (0.5–2.0×). DragonHD voices sound best plain but ignore styles — use a **· styles** voice such as Aria or Jenny for attitude.
 
-## 📋 Prerequisites
+## Trigger it from a mouse button
 
-- **Windows 10 or 11**
-- **[.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)** (only needed to build from source)
-- **One text‑to‑speech provider** of your choice (see below)
+Multi‑button mice can fire the shortcut, so you can read a selection without touching the keyboard:
 
----
+1. Open your mouse software (Logitech Options+, Razer Synapse, Microsoft Mouse and Keyboard Center, etc.).
+2. Select a spare button and assign a **keystroke / hotkey**.
+3. Record Sonja's shortcut (default **Ctrl + Alt + R**) and save.
 
-## 🔑 Choose and set up a voice provider
+No vendor software? Map a button to the keys with [AutoHotkey](https://www.autohotkey.com/). That button now reads or stops the selection.
 
-You need credentials from **one** of the following. Pick whichever you prefer.
-
-### Option A — Azure AI Speech (recommended)
-
-Great neural voices, including the newer high‑definition DragonHD voices.
-
-1. Create an **Azure AI Speech** (or multi‑service **Azure AI Services**) resource in the [Azure portal](https://portal.azure.com).
-2. Open the resource → **Keys and Endpoint**.
-3. Copy **Key 1** and the **Location/Region** (e.g. `westeurope`, `eastus`).
-4. Put them in your `.env`:
-
-   ```dotenv
-   SPEECH_KEY=your-speech-key
-   SPEECH_REGION=westeurope
-   ```
-
-   > If your resource uses a custom domain instead of a plain region, set `SPEECH_ENDPOINT=https://<your-resource>.cognitiveservices.azure.com/` as well.
-
-To pick a voice, launch Sonja and click **Refresh voices** — the dropdown fills with every voice available on your resource. Example voice names: `en-US-AvaMultilingualNeural`, `en-US-Ava:DragonHDLatestNeural`, `en-GB-SoniaNeural`.
-
-### Option B — ElevenLabs
-
-1. Sign up at [elevenlabs.io](https://elevenlabs.io) and create an API key.
-2. Add it to your `.env`:
-
-   ```dotenv
-   ELEVENLABS_API_KEY=your-elevenlabs-key
-   ```
-
-### Option C — Azure OpenAI TTS (Microsoft Foundry)
-
-1. Deploy a TTS model (e.g. `tts` / `gpt-4o-mini-tts`) in your Azure OpenAI / Foundry project.
-2. Add the endpoint, key, and deployment name to your `.env`:
-
-   ```dotenv
-   AZURE_OPENAI_TTS_ENDPOINT=https://your-resource.openai.azure.com/
-   AZURE_OPENAI_TTS_KEY=your-key
-   AZURE_OPENAI_TTS_DEPLOYMENT=your-tts-deployment
-   AZURE_OPENAI_TTS_API_VERSION=2025-03-01-preview
-   ```
-
----
-
-## ⚙️ Configuration
-
-Sonja reads settings from **process environment variables** or a **`.env` file** placed beside the executable (it also searches up to five parent directories).
-
-1. Copy the template:
-
-   ```powershell
-   Copy-Item .env.example .env
-   ```
-
-2. Fill in the values for your chosen provider (see above).
-
-### Environment variables
-
-| Variable | Provider | Required | Description |
-| --- | --- | --- | --- |
-| `SPEECH_KEY` | Azure Speech | ✅ (for Azure Speech) | Azure AI Speech resource key |
-| `SPEECH_REGION` | Azure Speech | ✅* | Resource region, e.g. `westeurope` |
-| `SPEECH_ENDPOINT` | Azure Speech | ➖ | Custom‑domain endpoint (fallback when no region) |
-| `ELEVENLABS_API_KEY` | ElevenLabs | ✅ (for ElevenLabs) | ElevenLabs API key |
-| `AZURE_OPENAI_TTS_ENDPOINT` | Azure OpenAI TTS | ✅ (for Foundry) | Azure OpenAI endpoint |
-| `AZURE_OPENAI_TTS_KEY` | Azure OpenAI TTS | ✅ (for Foundry) | Azure OpenAI key |
-| `AZURE_OPENAI_TTS_DEPLOYMENT` | Azure OpenAI TTS | ✅ (for Foundry) | TTS deployment name |
-| `AZURE_OPENAI_TTS_API_VERSION` | Azure OpenAI TTS | ➖ | Defaults to `2025-03-01-preview` |
-
-\* Either `SPEECH_REGION` or `SPEECH_ENDPOINT` is required for Azure Speech.
-
-> 🔒 **Never commit your `.env`.** It is already listed in `.gitignore`. Your keys stay on your machine and are never written to Sonja's settings file or logs.
-
----
-
-## 🛠️ Build and run
+## Build & publish
 
 ```powershell
-git clone https://github.com/<your-username>/sonja-read-aloud.git
-cd sonja-read-aloud
-Copy-Item .env.example .env   # then fill in your provider credentials
-
-dotnet build Sonja.slnx --configuration Release
-dotnet run --project Sonja.ReadAloud.csproj
+dotnet build Sonja.slnx -c Release                                # build
+dotnet test                                                       # run tests
+dotnet publish Sonja.ReadAloud.csproj /p:PublishProfile=Win-x64   # self-contained win-x64
 ```
 
-### Publish a standalone executable
+The published app is at `artifacts/publish/win-x64/Sonja.ReadAloud.exe`; keep a private `.env` beside it.
 
-Produce a self‑contained build that runs without installing .NET:
+## Notes
 
-```powershell
-dotnet publish Sonja.ReadAloud.csproj --configuration Release --runtime win-x64 --self-contained true --output artifacts/publish/win-x64
-```
+- Selection capture uses UI Automation, falling back to a brief **Ctrl + C** (your clipboard is restored). Reading from an elevated window needs Sonja running at the same elevation.
+- Other providers work too if configured instead of Azure Speech: ElevenLabs (`ELEVENLABS_API_KEY`) or Azure OpenAI TTS (`AZURE_OPENAI_TTS_*`).
+- Theme colors live in [`App.xaml`](App.xaml); replace [`Assets/sonja.ico`](Assets/sonja.ico) to change the icon.
 
-The app is at `artifacts/publish/win-x64/Sonja.ReadAloud.exe`. Place a private `.env` beside it (or define the environment variables system‑wide), then double‑click to run.
+## License
 
----
+[MIT](LICENSE). Icon: cherry blossom from [Twemoji](https://github.com/jdecked/twemoji) (CC‑BY 4.0).
 
-## ▶️ Usage
-
-1. Launch `Sonja.ReadAloud.exe`.
-2. In the settings window, choose your shortcut and voice, then **Save settings**.
-3. Select text in any application.
-4. Press the shortcut (default **Ctrl + Alt + R**) to start reading.
-5. Press it again to stop.
-
-Closing the window leaves Sonja running in the notification area. Right‑click the tray icon to reopen settings, test the voice, or exit. Enable **Start Sonja when I sign in to Windows** to launch it automatically at login.
-
----
-
-## 🖱️ How selection capture works
-
-Sonja first asks Windows **UI Automation** for the selected text. If an application doesn't expose a text‑selection provider, Sonja temporarily sends **Ctrl + C**, reads the copied text, and restores your previous clipboard contents.
-
-Windows prevents a normal app from reading input from an elevated (administrator) app. If you need selection capture to work inside an elevated window, run Sonja at the same elevation level. Some DRM‑protected text intentionally cannot be copied or exposed through accessibility APIs.
-
----
-
-## 🎨 Customizing the look
-
-The pink‑and‑black theme is defined with a handful of brushes in [`App.xaml`](App.xaml) (`WindowBackgroundBrush`, `CardBrush`, `PrimaryBrush`, `TextBrush`, and friends). Change those color values to reskin the whole app. The header gradient and status colors live in [`MainWindow.xaml`](MainWindow.xaml) and [`MainWindow.xaml.cs`](MainWindow.xaml.cs).
-
-To change the tray/app icon, replace [`Assets/sonja.ico`](Assets/sonja.ico) with your own `.ico`.
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please open an issue to discuss substantial changes first. For pull requests:
-
-- Keep changes focused and match the existing code style.
-- Run `dotnet build` and `dotnet test` before submitting.
-- Don't commit secrets — verify `git status` shows no `.env`.
-
----
-
-## 📄 License
-
-Released under the [MIT License](LICENSE).
-
-## 🙏 Credits
-
-The tray and application icon is the cherry blossom glyph from [Twemoji](https://github.com/jdecked/twemoji), licensed under [CC‑BY 4.0](https://creativecommons.org/licenses/by/4.0/).

@@ -17,6 +17,8 @@ public partial class App : System.Windows.Application
 	private SpeechService? _speechService;
 	private SettingsStore? _settingsStore;
 	private StartupService? _startupService;
+	private CredentialStore? _credentialStore;
+	private SpeechConnectionOptions? _speechOptions;
 	private AppSettings _settings = new();
 	private readonly SemaphoreSlim _selectionGate = new(1, 1);
 	private bool _isExiting;
@@ -39,8 +41,9 @@ public partial class App : System.Windows.Application
 
 		try
 		{
-			var environment = DotEnvLoader.Load();
-			var speechOptions = SpeechConnectionOptions.FromEnvironment(environment);
+			_credentialStore = new CredentialStore();
+			var speechOptions = BuildSpeechOptions();
+			_speechOptions = speechOptions;
 
 			_settingsStore = new SettingsStore();
 			_startupService = new StartupService();
@@ -53,7 +56,8 @@ public partial class App : System.Windows.Application
 				speechOptions,
 				_speechService,
 				ApplySettingsAsync,
-				TestVoiceAsync);
+				TestVoiceAsync,
+				SaveCredentialsAsync);
 			MainWindow = _mainWindow;
 			_mainWindow.Closing += MainWindow_Closing;
 			_mainWindow.Show();
@@ -74,8 +78,8 @@ public partial class App : System.Windows.Application
 			}
 			else if (!speechOptions.IsConfigured)
 			{
-				const string message = "No speech provider is configured. Add Azure Speech or Azure OpenAI TTS settings to .env.";
-				_mainWindow.SetStatus(message, StatusLevel.Error);
+				const string message = "No speech provider yet. Add your Azure Speech key in the Connection panel.";
+				_mainWindow.SetStatus(message, StatusLevel.Warning);
 				_trayIcon.ShowNotification("Speech setup needed", message, NotificationKind.Warning);
 			}
 			else
@@ -117,7 +121,7 @@ public partial class App : System.Windows.Application
 		{
 			if (!_speechService.IsConfigured)
 			{
-				const string message = "Azure speech credentials are missing or invalid in .env.";
+				const string message = "No Azure Speech key yet. Add it in the Connection panel.";
 				_mainWindow.SetStatus(message, StatusLevel.Error);
 				_trayIcon?.ShowNotification("Speech not configured", message, NotificationKind.Error);
 				return;
@@ -157,7 +161,7 @@ public partial class App : System.Windows.Application
 			return;
 		}
 
-		var result = await _speechService.SpeakAsync(text, _settings.VoiceName, _settings.RatePercent);
+		var result = await _speechService.SpeakAsync(text, _settings.VoiceName, _settings.RatePercent, _settings.Style, _settings.StyleDegree);
 		if (result.Success)
 		{
 			_mainWindow.SetStatus($"Ready · select text and press {_settings.Hotkey.DisplayName}", StatusLevel.Ready);
@@ -205,14 +209,93 @@ public partial class App : System.Windows.Application
 		}
 	}
 
-	private Task<OperationResult> TestVoiceAsync(AppSettings proposed)
+	private SpeechConnectionOptions BuildSpeechOptions(SpeechCredentials? overrideCredentials = null)
 	{
-		return _speechService is null
+		var environment = DotEnvLoader.Load();
+		var merged = new Dictionary<string, string>(environment, StringComparer.OrdinalIgnoreCase);
+		var credentials = overrideCredentials ?? _credentialStore?.Load();
+		if (credentials is not null && !string.IsNullOrWhiteSpace(credentials.Key))
+		{
+			merged["SPEECH_KEY"] = credentials.Key;
+			if (!string.IsNullOrWhiteSpace(credentials.Region))
+			{
+				merged["SPEECH_REGION"] = credentials.Region;
+			}
+
+			if (!string.IsNullOrWhiteSpace(credentials.Endpoint))
+			{
+				merged["SPEECH_ENDPOINT"] = credentials.Endpoint;
+			}
+		}
+
+		return SpeechConnectionOptions.FromEnvironment(merged);
+	}
+
+	private async Task<OperationResult> SaveCredentialsAsync(SpeechCredentials credentials)
+	{
+		if (_credentialStore is null)
+		{
+			return OperationResult.Fail("The app is not ready yet.");
+		}
+
+		if (string.IsNullOrWhiteSpace(credentials.Key))
+		{
+			return OperationResult.Fail("Enter your Azure Speech key.");
+		}
+
+		if (string.IsNullOrWhiteSpace(credentials.Region) && string.IsNullOrWhiteSpace(credentials.Endpoint))
+		{
+			return OperationResult.Fail("Enter your Azure Speech region, e.g. westeurope.");
+		}
+
+		// Validate the key against the live service before persisting it.
+		var probeOptions = BuildSpeechOptions(credentials);
+		if (!probeOptions.IsAzureSpeechConfigured)
+		{
+			return OperationResult.Fail("Those details aren't valid for Azure Speech.");
+		}
+
+		var probeService = new SpeechService(probeOptions);
+		var voices = await probeService.GetVoicesAsync();
+		if (!voices.Success)
+		{
+			probeService.Dispose();
+			return OperationResult.Fail(voices.Message);
+		}
+
+		try
+		{
+			_credentialStore.Save(credentials);
+		}
+		catch (Exception ex)
+		{
+			probeService.Dispose();
+			return OperationResult.Fail($"The key could not be saved: {ex.Message}");
+		}
+
+		if (_speechService is not null)
+		{
+			await _speechService.StopAsync();
+		}
+
+		var previousService = _speechService;
+		_speechService = probeService;
+		_speechOptions = probeOptions;
+		previousService?.Dispose();
+
+		_mainWindow?.UpdateSpeechProvider(probeOptions, probeService);
+		return OperationResult.Ok("Azure Speech connected.");
+	}
+
+	private Task<OperationResult> TestVoiceAsync(AppSettings proposed)
+	{		return _speechService is null
 			? Task.FromResult(OperationResult.Fail("The speech service is not ready."))
 			: _speechService.SpeakAsync(
 				"Sonja Read Aloud is ready. Select text in any application, then press your shortcut.",
 				proposed.VoiceName,
-				proposed.RatePercent);
+				proposed.RatePercent,
+				proposed.Style,
+				proposed.StyleDegree);
 	}
 
 	private async Task TestVoiceFromTrayAsync()

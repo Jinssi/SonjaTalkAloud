@@ -9,10 +9,11 @@ namespace Sonja.ReadAloud;
 
 public partial class MainWindow : Window
 {
-    private readonly SpeechConnectionOptions _speechOptions;
-    private readonly SpeechService _speechService;
+    private SpeechConnectionOptions _speechOptions;
+    private SpeechService _speechService;
     private readonly Func<AppSettings, Task<OperationResult>> _applySettings;
     private readonly Func<AppSettings, Task<OperationResult>> _testVoice;
+    private readonly Func<SpeechCredentials, Task<OperationResult>> _saveCredentials;
     private AppSettings _currentSettings;
     private HotkeyDefinition _pendingHotkey;
     private bool _hasLoadedVoices;
@@ -22,7 +23,8 @@ public partial class MainWindow : Window
         SpeechConnectionOptions speechOptions,
         SpeechService speechService,
         Func<AppSettings, Task<OperationResult>> applySettings,
-        Func<AppSettings, Task<OperationResult>> testVoice)
+        Func<AppSettings, Task<OperationResult>> testVoice,
+        Func<SpeechCredentials, Task<OperationResult>> saveCredentials)
     {
         InitializeComponent();
 
@@ -34,13 +36,41 @@ public partial class MainWindow : Window
         _speechService = speechService;
         _applySettings = applySettings;
         _testVoice = testVoice;
+        _saveCredentials = saveCredentials;
 
         HotkeyTextBox.Text = _pendingHotkey.DisplayName;
+        SpeechRegionBox.Text = speechOptions.Region ?? string.Empty;
         VoiceComboBox.Text = speechOptions.GetCompatibleVoice(settings.VoiceName);
         RateSlider.Value = settings.RatePercent;
+        StyleComboBox.ItemsSource = SpeakingStyleOption.Catalog;
+        StyleComboBox.SelectedItem = SpeakingStyleOption.Catalog.FirstOrDefault(
+            option => option.Value.Equals(settings.Style, StringComparison.OrdinalIgnoreCase)) ?? SpeakingStyleOption.Natural;
+        StyleDegreeSlider.Value = settings.StyleDegree;
         StartWithWindowsCheckBox.IsChecked = settings.StartWithWindows;
         ShowNotificationsCheckBox.IsChecked = settings.ShowNotifications;
         ConnectionText.Text = speechOptions.ConnectionSummary;
+        UpdateStyleHint();
+        UpdateConnectionHint();
+    }
+
+    public void UpdateSpeechProvider(SpeechConnectionOptions options, SpeechService service)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() => UpdateSpeechProvider(options, service));
+            return;
+        }
+
+        _speechOptions = options;
+        _speechService = service;
+        ConnectionText.Text = options.ConnectionSummary;
+        if (!string.IsNullOrWhiteSpace(options.Region))
+        {
+            SpeechRegionBox.Text = options.Region;
+        }
+
+        _hasLoadedVoices = false;
+        _ = LoadVoicesAsync();
     }
 
     private static System.Windows.Media.ImageSource? LoadWindowIcon()
@@ -139,6 +169,53 @@ public partial class MainWindow : Window
         }
     }
 
+    private void StyleDegreeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (StyleDegreeValueText is not null)
+        {
+            StyleDegreeValueText.Text = $"{e.NewValue:0.0}×";
+        }
+    }
+
+    private void StyleComboBox_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        UpdateStyleHint();
+    }
+
+    private void VoiceComboBox_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        UpdateStyleHint();
+    }
+
+    private void UpdateStyleHint()
+    {
+        if (StyleHint is null || IntensityGrid is null)
+        {
+            return;
+        }
+
+        var styleActive = !string.IsNullOrEmpty(GetSelectedStyle());
+        IntensityGrid.IsEnabled = styleActive;
+
+        if (!styleActive)
+        {
+            StyleHint.Text = "Natural reads the text with no added emotion. Choose an attitude to add expression.";
+            StyleHint.Foreground = new SolidColorBrush(MediaColor.FromRgb(185, 139, 166));
+            return;
+        }
+
+        if (SpeechService.SupportsExpressiveStyles(GetSelectedVoiceName()))
+        {
+            StyleHint.Text = "Attitude will be applied by Azure neural speaking styles.";
+            StyleHint.Foreground = new SolidColorBrush(MediaColor.FromRgb(103, 232, 165));
+        }
+        else
+        {
+            StyleHint.Text = "This voice may ignore attitude. Pick a · styles voice such as Aria, Jenny or Sara for the clearest effect.";
+            StyleHint.Foreground = new SolidColorBrush(MediaColor.FromRgb(251, 191, 36));
+        }
+    }
+
     private async void RefreshVoicesButton_Click(object sender, RoutedEventArgs e)
     {
         await LoadVoicesAsync();
@@ -226,6 +303,71 @@ public partial class MainWindow : Window
         Hide();
     }
 
+    private async void SaveConnectionButton_Click(object sender, RoutedEventArgs e)
+    {
+        var key = SpeechKeyBox.Password.Trim();
+        var region = SpeechRegionBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            SetConnectionHint("Enter your Azure Speech key.", StatusLevel.Warning);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(region))
+        {
+            SetConnectionHint("Enter your Azure Speech region, e.g. westeurope.", StatusLevel.Warning);
+            return;
+        }
+
+        SaveConnectionButton.IsEnabled = false;
+        SetConnectionHint("Connecting…", StatusLevel.Working);
+        SetStatus("Connecting to Azure Speech…", StatusLevel.Working);
+        try
+        {
+            var result = await _saveCredentials(new SpeechCredentials(key, region, null));
+            if (result.Success)
+            {
+                SpeechKeyBox.Clear();
+                SetConnectionHint("Connected. Your key is saved securely for this Windows account.", StatusLevel.Ready);
+            }
+            else
+            {
+                SetConnectionHint(result.Message, StatusLevel.Error);
+                SetStatus(result.Message, StatusLevel.Error);
+            }
+        }
+        finally
+        {
+            SaveConnectionButton.IsEnabled = true;
+        }
+    }
+
+    private void UpdateConnectionHint()
+    {
+        if (_speechOptions.IsAzureSpeechConfigured)
+        {
+            SetConnectionHint($"Connected · {_speechOptions.ConnectionSummary}", StatusLevel.Ready);
+        }
+        else
+        {
+            SetConnectionHint("Paste your key and region, then Save & connect. Example region: westeurope.", StatusLevel.Ready);
+        }
+    }
+
+    private void SetConnectionHint(string message, StatusLevel level)
+    {
+        ConnectionHint.Text = message;
+        var color = level switch
+        {
+            StatusLevel.Ready => MediaColor.FromRgb(103, 232, 165),
+            StatusLevel.Working => MediaColor.FromRgb(183, 163, 255),
+            StatusLevel.Warning => MediaColor.FromRgb(251, 191, 36),
+            StatusLevel.Error => MediaColor.FromRgb(248, 113, 113),
+            _ => MediaColor.FromRgb(185, 139, 166)
+        };
+        ConnectionHint.Foreground = new SolidColorBrush(color);
+    }
+
     private AppSettings BuildProposedSettings()
     {
         return new AppSettings
@@ -233,9 +375,16 @@ public partial class MainWindow : Window
             Hotkey = _pendingHotkey.Clone(),
             VoiceName = GetSelectedVoiceName(),
             RatePercent = (int)RateSlider.Value,
+            Style = GetSelectedStyle(),
+            StyleDegree = StyleDegreeSlider.Value,
             StartWithWindows = StartWithWindowsCheckBox.IsChecked == true,
             ShowNotifications = ShowNotificationsCheckBox.IsChecked == true
         };
+    }
+
+    private string GetSelectedStyle()
+    {
+        return StyleComboBox.SelectedItem is SpeakingStyleOption option ? option.Value : string.Empty;
     }
 
     private string GetSelectedVoiceName()

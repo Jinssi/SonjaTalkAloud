@@ -21,6 +21,7 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <Border Grid.Row="0" CornerRadius="18" Padding="28" Margin="0,0,0,18">
@@ -66,6 +67,45 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="Azure Speech connection" FontSize="18" FontWeight="SemiBold" />
+                    <TextBlock Grid.Row="1" Text="Paste your Azure AI Speech key and region. Sonja saves it encrypted for your Windows account — no rebuild or .env needed."
+                               Foreground="{StaticResource MutedTextBrush}" Margin="0,5,0,14" TextWrapping="Wrap" />
+                    <Border Grid.Row="2" Background="#180C13" BorderBrush="#45283A" BorderThickness="1" CornerRadius="9" Padding="14,10">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="70" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Key" VerticalAlignment="Center" Foreground="{StaticResource MutedTextBrush}" />
+                            <PasswordBox x:Name="SpeechKeyBox" Grid.Column="1" Background="Transparent" BorderThickness="0" Foreground="#FFFFFF" CaretBrush="#FFFFFF" FontSize="15" VerticalContentAlignment="Center" />
+                        </Grid>
+                    </Border>
+                    <Border Grid.Row="3" Background="#180C13" BorderBrush="#45283A" BorderThickness="1" CornerRadius="9" Padding="14,10" Margin="0,10,0,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="70" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Region" VerticalAlignment="Center" Foreground="{StaticResource MutedTextBrush}" />
+                            <TextBox x:Name="SpeechRegionBox" Grid.Column="1" Background="Transparent" BorderThickness="0" Foreground="#FFFFFF" CaretBrush="#FFFFFF" FontSize="15" VerticalContentAlignment="Center" />
+                        </Grid>
+                    </Border>
+                    <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,16,0,0">
+                        <Button x:Name="SaveConnectionButton" Content="Save &amp; connect" Click="SaveConnectionButton_Click" />
+                        <TextBlock x:Name="ConnectionHint" VerticalAlignment="Center" Margin="14,0,0,0" TextWrapping="Wrap" MaxWidth="430" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Border Grid.Row="3" Background="{StaticResource CardBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="14" Padding="24" Margin="0,0,0,18">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <TextBlock Text="Shortcut" FontSize="18" FontWeight="SemiBold" />
                     <TextBlock Grid.Row="1" Text="Click the field and press the new key combination. Include Ctrl, Alt, Shift, or Windows."
@@ -87,7 +127,7 @@
                 </Grid>
             </Border>
 
-            <Border Grid.Row="3" Background="{StaticResource CardBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="14" Padding="24" Margin="0,0,0,18">
+            <Border Grid.Row="4" Background="{StaticResource CardBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="14" Padding="24" Margin="0,0,0,18">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -95,16 +135,19 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <TextBlock Text="Voice" FontSize="18" FontWeight="SemiBold" />
-                    <TextBlock Grid.Row="1" Text="Voice choices are loaded from your configured Azure Speech or Foundry TTS resource."
-                               Foreground="{StaticResource MutedTextBrush}" Margin="0,5,0,14" />
+                    <TextBlock Grid.Row="1" Text="Voice choices are loaded from your configured Azure Speech or Foundry TTS resource. ★ marks recommended natural voices; · styles marks voices that support attitude."
+                               Foreground="{StaticResource MutedTextBrush}" Margin="0,5,0,14" TextWrapping="Wrap" />
                     <Grid Grid.Row="2">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <ComboBox x:Name="VoiceComboBox" IsEditable="True" IsTextSearchEnabled="True" DisplayMemberPath="DisplayName" />
+                        <ComboBox x:Name="VoiceComboBox" IsEditable="True" IsTextSearchEnabled="True" DisplayMemberPath="DisplayName" SelectionChanged="VoiceComboBox_SelectionChanged" />
                         <Button x:Name="RefreshVoicesButton" Grid.Column="1" Content="Refresh voices" Style="{StaticResource SecondaryButtonStyle}" Margin="10,0,0,0" Click="RefreshVoicesButton_Click" />
                     </Grid>
                     <Grid Grid.Row="3" Margin="0,20,0,0">
@@ -117,14 +160,34 @@
                         <Slider x:Name="RateSlider" Grid.Column="1" Minimum="-40" Maximum="50" TickFrequency="5" IsSnapToTickEnabled="True" ValueChanged="RateSlider_ValueChanged" />
                         <TextBlock x:Name="RateValueText" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center" Text="0%" />
                     </Grid>
-                    <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,20,0,0">
+                    <Grid Grid.Row="4" Margin="0,20,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Attitude" VerticalAlignment="Center" Margin="0,0,16,0" />
+                        <ComboBox x:Name="StyleComboBox" Grid.Column="1" DisplayMemberPath="DisplayName" SelectionChanged="StyleComboBox_SelectionChanged" />
+                    </Grid>
+                    <Grid x:Name="IntensityGrid" Grid.Row="5" Margin="0,16,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="56" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Intensity" VerticalAlignment="Center" Margin="0,0,16,0" />
+                        <Slider x:Name="StyleDegreeSlider" Grid.Column="1" Minimum="0.5" Maximum="2" TickFrequency="0.1" IsSnapToTickEnabled="True" ValueChanged="StyleDegreeSlider_ValueChanged" />
+                        <TextBlock x:Name="StyleDegreeValueText" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center" Text="1.0×" />
+                    </Grid>
+                    <TextBlock x:Name="StyleHint" Grid.Row="6" Foreground="#B98BA6" TextWrapping="Wrap" Margin="0,10,0,0"
+                               Text="Attitude uses Azure neural speaking styles. Pick a · styles voice such as Aria or Jenny for the clearest effect." />
+                    <StackPanel Grid.Row="7" Orientation="Horizontal" Margin="0,20,0,0">
                         <Button x:Name="TestVoiceButton" Content="Test voice" Style="{StaticResource SecondaryButtonStyle}" Click="TestVoiceButton_Click" />
                         <TextBlock x:Name="ConnectionText" Foreground="#B98BA6" VerticalAlignment="Center" Margin="14,0,0,0" />
                     </StackPanel>
                 </Grid>
             </Border>
 
-            <Grid Grid.Row="4">
+            <Grid Grid.Row="5">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />

@@ -62,6 +62,62 @@ public sealed class ConfigurationTests
     }
 
     [Fact]
+    public void StyleCapableVoiceIsRecognizedAndDragonHdIsNot()
+    {
+        Assert.True(SpeechService.SupportsExpressiveStyles("en-US-AriaNeural"));
+        Assert.False(SpeechService.SupportsExpressiveStyles("en-US-Ava:DragonHDLatestNeural"));
+        Assert.False(SpeechService.SupportsExpressiveStyles(null));
+    }
+
+    [Fact]
+    public void NormalizeClampsStyleDegreeAndTrimsStyle()
+    {
+        var settings = new AppSettings { Style = "  cheerful  ", StyleDegree = 5.0 };
+
+        settings.Normalize();
+
+        Assert.Equal("cheerful", settings.Style);
+        Assert.Equal(2.0, settings.StyleDegree);
+    }
+
+    [Fact]
+    public void NormalizeRestoresDefaultStyleDegreeWhenUnset()
+    {
+        var settings = new AppSettings { StyleDegree = 0 };
+
+        settings.Normalize();
+
+        Assert.Equal(1.0, settings.StyleDegree);
+    }
+
+    [Fact]
+    public void CredentialStoreRoundTripsEncryptedKey()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"sonja-creds-{Guid.NewGuid():N}.dat");
+        try
+        {
+            var store = new CredentialStore(path);
+            store.Save(new SpeechCredentials("secret-key", "westeurope", null));
+
+            var loaded = store.Load();
+
+            Assert.NotNull(loaded);
+            Assert.Equal("secret-key", loaded!.Key);
+            Assert.Equal("westeurope", loaded.Region);
+
+            var onDisk = File.ReadAllText(path);
+            Assert.DoesNotContain("secret-key", onDisk);
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
+    [Fact]
     public async Task StopAsyncCancelsCloudPlaybackMidSentence()
     {
         var options = new SpeechConnectionOptions

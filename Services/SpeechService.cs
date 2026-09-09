@@ -34,6 +34,25 @@ public sealed class SpeechService : IDisposable
         new("shimmer", "Shimmer · clear and upbeat", "Multilingual")
     };
 
+    // Azure neural voices that honour <mstts:express-as> speaking styles.
+    private static readonly IReadOnlySet<string> StyleCapableVoices = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "en-US-AriaNeural", "en-US-JennyNeural", "en-US-SaraNeural", "en-US-NancyNeural",
+        "en-US-JaneNeural", "en-US-AshleyNeural", "en-US-AmberNeural", "en-US-AnaNeural",
+        "en-GB-SoniaNeural", "en-US-DavisNeural", "en-US-GuyNeural", "en-US-TonyNeural",
+        "en-US-JasonNeural"
+    };
+
+    // High-quality, natural-sounding voices surfaced first in the picker.
+    private static readonly IReadOnlySet<string> RecommendedVoices = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "en-US-Ava:DragonHDLatestNeural", "en-US-AvaMultilingualNeural", "en-US-EmmaMultilingualNeural",
+        "en-US-AriaNeural", "en-US-JennyNeural", "en-US-SaraNeural", "en-GB-SoniaNeural"
+    };
+
+    public static bool SupportsExpressiveStyles(string? voiceName) =>
+        !string.IsNullOrWhiteSpace(voiceName) && StyleCapableVoices.Contains(voiceName);
+
     private readonly SpeechConnectionOptions _options;
     private readonly HttpClient _httpClient;
     private readonly Func<Stream, TimeSpan, CancellationToken, Task<bool>>? _playbackOverride;
@@ -75,7 +94,12 @@ public sealed class SpeechService : IDisposable
         }
     }
 
-    public async Task<OperationResult> SpeakAsync(string text, string voiceName, int ratePercent)
+    public async Task<OperationResult> SpeakAsync(
+        string text,
+        string voiceName,
+        int ratePercent,
+        string? style = null,
+        double styleDegree = 1.0)
     {
         if (!IsConfigured)
         {
@@ -101,7 +125,7 @@ public sealed class SpeechService : IDisposable
 
             if (_options.IsAzureSpeechConfigured)
             {
-                return await SpeakWithAzureSpeechAsync(text, voiceName, ratePercent);
+                return await SpeakWithAzureSpeechAsync(text, voiceName, ratePercent, style, styleDegree);
             }
 
             return _options.IsElevenLabsConfigured
@@ -132,7 +156,12 @@ public sealed class SpeechService : IDisposable
         }
     }
 
-    private async Task<OperationResult> SpeakWithAzureSpeechAsync(string text, string voiceName, int ratePercent)
+    private async Task<OperationResult> SpeakWithAzureSpeechAsync(
+        string text,
+        string voiceName,
+        int ratePercent,
+        string? style,
+        double styleDegree)
     {
         var speechConfig = CreateSpeechConfig(voiceName);
         using var audioConfig = AudioConfig.FromDefaultSpeakerOutput();
@@ -150,7 +179,7 @@ public sealed class SpeechService : IDisposable
                 return OperationResult.Stopped();
             }
 
-            var ssml = BuildSsml(chunk, voiceName, ratePercent);
+            var ssml = BuildSsml(chunk, voiceName, ratePercent, style, styleDegree);
             var result = await synthesizer.SpeakSsmlAsync(ssml);
             if (WasStopRequested())
             {
@@ -351,12 +380,27 @@ public sealed class SpeechService : IDisposable
 
             var voices = result.Voices
                 .Where(voice => !string.IsNullOrWhiteSpace(voice.ShortName))
-                .Select(voice => new VoiceOption(
-                    voice.ShortName,
-                    $"{voice.LocalName} · {voice.Locale} · {voice.Gender}",
-                    voice.Locale))
-                .OrderBy(voice => voice.Locale, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(voice => voice.DisplayName, StringComparer.CurrentCultureIgnoreCase)
+                .Select(voice =>
+                {
+                    var recommended = RecommendedVoices.Contains(voice.ShortName);
+                    var hasStyles = StyleCapableVoices.Contains(voice.ShortName);
+                    var label = $"{voice.LocalName} · {voice.Locale} · {voice.Gender}";
+                    if (hasStyles)
+                    {
+                        label += " · styles";
+                    }
+
+                    if (recommended)
+                    {
+                        label = "★ " + label;
+                    }
+
+                    return (Option: new VoiceOption(voice.ShortName, label, voice.Locale), Recommended: recommended);
+                })
+                .OrderByDescending(entry => entry.Recommended)
+                .ThenBy(entry => entry.Option.Locale, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(entry => entry.Option.DisplayName, StringComparer.CurrentCultureIgnoreCase)
+                .Select(entry => entry.Option)
                 .ToArray();
 
             return new VoiceListResult(true, $"Loaded {voices.Length} voices.", voices);
@@ -649,14 +693,24 @@ public sealed class SpeechService : IDisposable
         }
     }
 
-    private static string BuildSsml(string text, string voiceName, int ratePercent)
+    private static string BuildSsml(string text, string voiceName, int ratePercent, string? style, double styleDegree)
     {
         var safeText = SecurityElement.Escape(text) ?? string.Empty;
         var safeVoice = SecurityElement.Escape(
             string.IsNullOrWhiteSpace(voiceName) ? AppSettings.DefaultVoiceName : voiceName) ?? AppSettings.DefaultVoiceName;
         var rate = Math.Clamp(ratePercent, -40, 50).ToString("+0;-0;0", System.Globalization.CultureInfo.InvariantCulture);
-        return $"<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'>" +
-               $"<voice name='{safeVoice}'><prosody rate='{rate}%'>{safeText}</prosody></voice></speak>";
+        var inner = $"<prosody rate='{rate}%'>{safeText}</prosody>";
+        if (!string.IsNullOrWhiteSpace(style))
+        {
+            var safeStyle = SecurityElement.Escape(style) ?? string.Empty;
+            var degree = Math.Clamp(styleDegree, 0.1, 2.0)
+                .ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+            inner = $"<mstts:express-as style='{safeStyle}' styledegree='{degree}'>{inner}</mstts:express-as>";
+        }
+
+        return "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' " +
+               "xmlns:mstts='https://www.w3.org/2001/mstts' xml:lang='en-US'>" +
+               $"<voice name='{safeVoice}'>{inner}</voice></speak>";
     }
 
     private static IEnumerable<string> ChunkText(string text, int maximumLength)
