@@ -15,7 +15,11 @@ Read the **text you've selected** aloud in any Windows app with one keyboard sho
 
 ## Quick start
 
-1. **Get an Azure Speech key.** Create an **Azure AI Speech** resource in the [Azure portal](https://portal.azure.com) → **Keys and Endpoint**, then copy **Key 1** + **Region** (the free F0 tier is enough).
+1. **Get an Azure Speech key.** You need an Azure AI Speech resource of your own (the app ships none):
+   - Sign in with an [Azure account](https://azure.microsoft.com/free/) — the **free F0** Speech tier is plenty. No subscription? Create one (the free account includes credit).
+   - **Either** create the resource in the [Azure portal](https://portal.azure.com): **Create a resource** → search **Speech** → **Create** (pick a subscription, resource group, and region), then open it and go to **Keys and Endpoint**.
+   - **Or** use [Speech Studio](https://speech.microsoft.com) → sign in → it can create/select a Speech resource for you; open your resource's **Keys and Endpoint** to see the key.
+   - Copy **Key 1** and the **Region/Location** (e.g. `westeurope`, `eastus`).
 2. **Run Sonja** (grab a published build, or from source: `dotnet run --project Sonja.ReadAloud.csproj`).
 3. **Connect.** In the **Azure Speech connection** panel, paste your **Key** and **Region** (e.g. `westeurope`) and click **Save & connect**. Your key is saved encrypted — no rebuild or `.env` needed.
 4. Click **Refresh voices**, pick a voice and attitude, then **Save settings**.
