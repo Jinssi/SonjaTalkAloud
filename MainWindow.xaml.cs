@@ -206,7 +206,7 @@ public partial class MainWindow : Window
 
         if (SpeechService.SupportsExpressiveStyles(GetSelectedVoiceName()))
         {
-            StyleHint.Text = "Attitude will be applied by Azure neural speaking styles.";
+            StyleHint.Text = "Azure adds the attitude with neural speaking styles.";
             StyleHint.Foreground = new SolidColorBrush(MediaColor.FromRgb(103, 232, 165));
         }
         else

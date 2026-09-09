@@ -43,7 +43,7 @@ public sealed class SpeechService : IDisposable
         "en-US-JasonNeural"
     };
 
-    // High-quality, natural-sounding voices surfaced first in the picker.
+    // High-quality, natural-sounding voices shown first in the picker.
     private static readonly IReadOnlySet<string> RecommendedVoices = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
         "en-US-Ava:DragonHDLatestNeural", "en-US-AvaMultilingualNeural", "en-US-EmmaMultilingualNeural",
